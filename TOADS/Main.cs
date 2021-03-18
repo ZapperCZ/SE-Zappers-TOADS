@@ -18,44 +18,29 @@ namespace SpaceEngineers
 {
     public sealed class Program : MyGridProgram
     {
-        //=======================================================================
-        //////////////////////////BEGIN//////////////////////////////////////////
-        //=======================================================================
+        List<IMyTextPanel> OutputLCDs;
         public Program()
         {
-            // The constructor, called only once every session and
-            // always before any other method is called. Use it to
-            // initialize your script. 
-            //     
-            // The constructor is optional and can be removed if not
-            // needed.
-            // 
-            // It's recommended to set RuntimeInfo.UpdateFrequency 
-            // here, which will allow your script to run itself without a 
-            // timer block.
+            Runtime.UpdateFrequency = UpdateFrequency.Update10;
+            OutputLCDs = new List<IMyTextPanel>();
+            List<IMyTerminalBlock> TempBlockList = new List<IMyTerminalBlock>();
+            GridTerminalSystem.SearchBlocksOfName("TOADS", TempBlockList);
+            foreach(IMyTerminalBlock TerminalBlock in TempBlockList)
+            {
+                if(TerminalBlock as IMyTextPanel != null)
+                {
+                    OutputLCDs.Add(TerminalBlock as IMyTextPanel);
+                }
+            }
+            Echo("TOADS\nDetected " + OutputLCDs.Count + " LCDs");
         }
 
         public void Main(string args)
         {
-            // Called when the program needs to save its state. Use
-            // this method to save your state to the Storage field
-            // or some other means. 
-            // 
-            // This method is optional and can be removed if not
-            // needed.
+            foreach(IMyTextPanel LCD in OutputLCDs)
+            {
+                LCD.WriteText("TOADS");
+            }
         }
-
-        public void Save()
-        {
-            // Called when the program needs to save its state. Use
-            // this method to save your state to the Storage field
-            // or some other means.
-
-            // This method is optional and can be removed if not
-            // needed.
-        }
-        //=======================================================================
-        //////////////////////////END////////////////////////////////////////////
-        //=======================================================================
     }
 }
