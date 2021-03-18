@@ -19,28 +19,56 @@ namespace SpaceEngineers
     public sealed class Program : MyGridProgram
     {
         List<IMyTextPanel> OutputLCDs;
+        IMyBlockGroup TOADSGroup;
+        bool hasAzimuthStab;
+        int timeToNextRefresh;
+
+        string echoString;
+        string refreshString;
+
+
         public Program()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update10;
-            OutputLCDs = new List<IMyTextPanel>();
-            List<IMyTerminalBlock> TempBlockList = new List<IMyTerminalBlock>();
-            GridTerminalSystem.SearchBlocksOfName("TOADS", TempBlockList);
-            foreach(IMyTerminalBlock TerminalBlock in TempBlockList)
-            {
-                if(TerminalBlock as IMyTextPanel != null)
-                {
-                    OutputLCDs.Add(TerminalBlock as IMyTextPanel);
-                }
-            }
-            Echo("TOADS\nDetected " + OutputLCDs.Count + " LCDs");
+            Runtime.UpdateFrequency = UpdateFrequency.Once | UpdateFrequency.Update10 | UpdateFrequency.Update100;
+            hasAzimuthStab = false;
+            timeToNextRefresh = -1;
+            echoString = "";
+            refreshString = "";
         }
 
-        public void Main(string args)
+        public void Main(string args, UpdateType updateType)
         {
-            foreach(IMyTextPanel LCD in OutputLCDs)
+            //=====Setup=====
+            if ((updateType & UpdateType.Once | UpdateType.Update100) != 0 && (updateType & UpdateType.Update10)==0)
             {
-                LCD.WriteText("TOADS");
+                if (timeToNextRefresh >= 0)
+                {
+                    timeToNextRefresh--;
+                }
+                else
+                {
+                    timeToNextRefresh = 10;
+
+                    TOADSGroup = GridTerminalSystem.GetBlockGroupWithName("TOADS");
+                    if (TOADSGroup == null)
+                    {
+                        echoString = "No group with the name \"TOADS\" found on the vehicle";
+                    }
+                    else
+                    {
+
+                        echoString = "";
+                    }
+                }
+                refreshString = "\nTime to next block refresh: " + timeToNextRefresh;
             }
+
+            //=====Update=====
+            if((updateType & UpdateType.Update10) != 0)
+            {
+
+            }
+            Echo(echoString + refreshString);
         }
     }
 }
