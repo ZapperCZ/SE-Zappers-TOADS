@@ -35,6 +35,8 @@ namespace SpaceEngineers
             Runtime.UpdateFrequency = UpdateFrequency.Once | UpdateFrequency.Update10 | UpdateFrequency.Update100;
             hasAzimuthStab = false;
             timeToNextRefresh = 0;
+            azimuthOffset = 0;
+            stabilizerOffset = 0;
             echoString = "";
             refreshString = "";
         }
@@ -73,8 +75,24 @@ namespace SpaceEngineers
                     }
                     else
                     {
+                        List<IMyMotorStator> TempRotorList = new List<IMyMotorStator>();
+
                         TOADSGroup.GetBlocksOfType<IMyTextPanel>(OutputLCDs);
-                        echoString = "Stabilizer > "+ hasAzimuthStab + "\nAzimuth offset > " + azimuthOffset;
+                        TOADSGroup.GetBlocksOfType(TempRotorList);
+                        foreach(IMyMotorStator Rotor in TempRotorList)
+                        {
+                            if (Rotor.CustomName.ToLower().Contains("azimuth"))
+                            {
+                                if (Rotor.CustomName.ToLower().Contains("stabilization"))
+                                {
+                                    AzimuthStabilizer = Rotor;
+                                }
+                                else
+                                {
+                                    AzimuthRotor = Rotor;
+                                }
+                            }
+                        }
                     }
                 }
                 refreshString = "\nTime to next block refresh: " + timeToNextRefresh;
@@ -83,9 +101,44 @@ namespace SpaceEngineers
             //=====Update=====
             if((updateType & UpdateType.Update10) != 0)
             {
-
+                echoString = "Turret angle to hull > " + Math.Round(CalculateTurretAngle(),0);
+                UpdateLCD();
             }
             Echo(echoString + refreshString);
+        }
+
+        private void UpdateLCD()
+        {
+            List<IMyTextPanel> LCDs = new List<IMyTextPanel>();
+            TOADSGroup.GetBlocksOfType(LCDs);
+            foreach(IMyTextPanel LCD in LCDs)
+            {
+                LCD.WriteText(Math.Round(CalculateTurretAngle(),0).ToString());
+            }
+        }
+
+        private double CalculateTurretAngle()
+        {
+            double result = 0;
+            double azimuthAng = RadianToDegree(AzimuthRotor.Angle);
+            if (hasAzimuthStab)
+            {
+                double stabAng = RadianToDegree(AzimuthStabilizer.Angle);
+                if ((azimuthAng + azimuthOffset) + (stabAng + stabilizerOffset) > 360)
+                {
+                    result = ((azimuthAng + azimuthOffset) + (stabAng + stabilizerOffset)) - 360;
+                }
+                else
+                {
+                    result = ((azimuthAng + azimuthOffset) + (stabAng + stabilizerOffset));
+                }
+
+            }
+            else
+            {
+                result = azimuthAng + azimuthOffset;
+            }
+            return result;
         }
 
         private string GetCustomData(string varName)
@@ -115,7 +168,7 @@ namespace SpaceEngineers
             }
             return "invalid";
         }
-
+    
         private void SetCustomData(string varName, string varValue)
         {
             string tempData = Me.CustomData;
@@ -147,6 +200,10 @@ namespace SpaceEngineers
             {
                 Me.CustomData = Me.CustomData + varName + " = " + varValue + "\n";
             }
+        }
+        private double RadianToDegree(double angle)
+        {
+            return angle * (180.0 / Math.PI);
         }
     }
 }
