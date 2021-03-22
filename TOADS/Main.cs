@@ -22,8 +22,10 @@ namespace SpaceEngineers
         List<IMyTextPanel> OutputLCDs;
         IMyMotorStator AzimuthRotor;
         IMyMotorStator AzimuthStabilizer;
+        IMyMotorStator AzimuthCupolaRotor;
         IMyBlockGroup TOADSGroup;
         bool hasAzimuthStab;
+        bool hasCupola;
         float azimuthOffset;
         float stabilizerOffset;
         int timeToNextRefresh;
@@ -36,7 +38,8 @@ namespace SpaceEngineers
         {
             Runtime.UpdateFrequency = UpdateFrequency.Once | UpdateFrequency.Update10 | UpdateFrequency.Update100;
             OutputLCDs = new List<IMyTextPanel>();
-            hasAzimuthStab = false;
+            hasAzimuthStab = true;
+            hasCupola = true;
             timeToNextRefresh = 0;
             azimuthOffset = 0;
             stabilizerOffset = 0;
@@ -60,7 +63,8 @@ namespace SpaceEngineers
 
                     if (Me.CustomData == "")
                     {
-                        SetCustomData("Has_Stabilizer", "false");
+                        SetCustomData("Has_Stabilizer", "true");
+                        SetCustomData("Has_Cupola","true");
                         SetCustomData("Azimuth_Offset", "0");
                         SetCustomData("Stabilizer_Offset", "0");
                         SetCustomData("Tank_Outline_Thickness", "10");
@@ -68,11 +72,13 @@ namespace SpaceEngineers
 
                     tankOutlineThickness = Convert.ToInt32(GetCustomData("Tank_Outline_Thickness"));
                     hasAzimuthStab = Convert.ToBoolean(GetCustomData("Has_Stabilizer"));
+                    hasCupola = Convert.ToBoolean(GetCustomData("Has_Cupola"));
                     azimuthOffset = Convert.ToSingle(GetCustomData("Azimuth_Offset"));
+
                     if (hasAzimuthStab)
                     {
                         stabilizerOffset = Convert.ToSingle(GetCustomData("Stabilizer_Offset"));
-                    }
+                    }   
 
                     TOADSGroup = GridTerminalSystem.GetBlockGroupWithName("TOADS");
                     if (TOADSGroup == null)
@@ -93,6 +99,10 @@ namespace SpaceEngineers
                                 {
                                     AzimuthStabilizer = Rotor;
                                 }
+                                else if(Rotor.CustomName.ToLower().Contains("cupola"))
+                                {
+                                    AzimuthCupolaRotor = Rotor;
+                                }
                                 else
                                 {
                                     AzimuthRotor = Rotor;
@@ -107,9 +117,10 @@ namespace SpaceEngineers
             //=====Update=====
             if((updateType & UpdateType.Update10) != 0)
             {
-                echoString = "Turret angle to hull > " + Math.Round(CalculateTurretAngle(),0);
+                echoString = "Turret angle to hull > " + Math.Round(CalculateTurretAngle(), 0);
+                echoString = "Cupola angle to hull > " + Math.Round(CalculateCupolaAngle(), 0);
 
-                foreach(IMyTextPanel LCDsurface in OutputLCDs)
+                foreach (IMyTextPanel LCDsurface in OutputLCDs)
                 {
                     UpdateLCD(LCDsurface);
                 }
@@ -131,42 +142,52 @@ namespace SpaceEngineers
         private void DrawSprites(ref MySpriteDrawFrame frame, RectangleF viewport, IMyTextPanel surface)
         {
             float turretRotation = Convert.ToSingle(Math.Round(CalculateTurretAngle(),0));
+            int cupolaRotation = Convert.ToInt32(Math.Round(CalculateCupolaAngle(),0));
             float turretRotationRad = Convert.ToSingle(DegreeToRadian(turretRotation));
             float gunRotationRad = turretRotationRad + Convert.ToSingle(DegreeToRadian(90));
-            int gunLength = 200;
-            int gunWidth = 25;
+            int gunLength = 180;
+            int gunWidth = 20;
             int turretLength = 140;
             int turretWidth = 100;
-
-            //Sounds good, doesn't work
 
             float gunOffset = (turretLength / 2) + (gunLength / 2);
             double gunPositionX = 0;
             double gunPositionY = 0;
-            if(turretRotation >= 90 && turretRotation <= 270)
+
+            gunPositionX = Math.Cos(gunRotationRad) * gunOffset * -1;
+
+            //Switching Y values because radians
+            if (turretRotation >= 90 && turretRotation <= 270)
             {
-                gunPositionX = Math.Cos(gunRotationRad) * gunOffset * -1;
                 gunPositionY = Math.Round(Math.Sqrt(Math.Pow(gunOffset, 2) - Math.Pow(gunPositionX, 2)));
             }
             else
             {
-                gunPositionX = Math.Cos(gunRotationRad) * gunOffset * -1;
                 gunPositionY = Math.Round(Math.Sqrt(Math.Pow(gunOffset, 2) - Math.Pow(gunPositionX, 2))) * -1;
             }
 
-
-            Vector2 turretHeadingPosition = new Vector2(256, 20) + viewport.Position;
+            Vector2 turretHeadingPosition = new Vector2(256, 15) + viewport.Position;
             Vector2 hullPosition = new Vector2(0,40) + viewport.Center;
-            Vector2 turretPosition = new Vector2(0, 50) + hullPosition;
+            Vector2 turretPosition = new Vector2(0, 55) + hullPosition;
             Vector2 gunPosition = new Vector2((Int32)gunPositionX ,(Int32)gunPositionY) + turretPosition;
 
-                 
             MySprite turretHeading = new MySprite()
             {
                 Type = SpriteType.TEXT,
                 Data = "Turret rotation > " + turretRotation.ToString(),
                 Position = turretHeadingPosition,
-                RotationOrScale = 1.3f,
+                RotationOrScale = 1.1f,
+                Color = surface.ScriptForegroundColor,
+                Alignment = TextAlignment.CENTER,
+                FontId = "White"
+            };
+
+            MySprite cupolaHeading = new MySprite()
+            {
+                Type = SpriteType.TEXT,
+                Data = "Cupola rotation > " + cupolaRotation.ToString(),
+                Position = new Vector2(0,30) + turretHeadingPosition,
+                RotationOrScale = 1.1f,
                 Color = surface.ScriptForegroundColor,
                 Alignment = TextAlignment.CENTER,
                 FontId = "White"
@@ -215,7 +236,6 @@ namespace SpaceEngineers
                 Alignment = TextAlignment.CENTER,
             };
 
-
             MySprite gunSprite = new MySprite()
             {
                 Type = SpriteType.TEXTURE,
@@ -234,17 +254,9 @@ namespace SpaceEngineers
             //frame.Add(turretSpriteFill);
             frame.Add(gunSprite);
             frame.Add(turretHeading);
+            frame.Add(cupolaHeading);
         }
-        /*
-         * If I have some sprite multiplayer syncing issues in future I will need to get this working
-        private void setupDrawFrame(IMyTextPanel surface)
-        {
-            drawFrame = surface.DrawFrame();
-            if (ticker % 4 != 0) { drawFrame.Add(new MySprite()); }
-            if (ticker % 6 != 0) { drawFrame.Add(new MySprite()); }
-            if (ticker % 8 != 0) { drawFrame.Add(new MySprite()); }
-        }
-        */
+
         private double CalculateTurretAngle()
         {
             double result = 0;
@@ -266,6 +278,17 @@ namespace SpaceEngineers
             else
             {
                 result = azimuthAng + azimuthOffset;
+            }
+            return result;
+        }
+        private double CalculateCupolaAngle()
+        {
+            double result = 0;
+            double azimuthAng = RadianToDegree(AzimuthCupolaRotor.Angle);
+            result = azimuthAng + CalculateTurretAngle();
+            if(result >= 360)
+            {
+                result -= 360;
             }
             return result;
         }
